@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-// Import file modular yang baru kita buat
-import AdminDashboard from "../components/AdminDashboard"; // Sesuaikan pathnya
-import UserDashboard from "../components/UserDashboard"; // Sesuaikan pathnya
+import { toast } from "sonner";
+import AdminDashboard from "../components/AdminDashboard";
+import UserDashboard from "../components/UserDashboard";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -9,184 +9,253 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    // Ambil data dari localStorage
+    // Ambil data user dari localStorage hasil login NIK
     const savedUser = localStorage.getItem("user");
-
     if (savedUser) {
       setUser(JSON.parse(savedUser));
+    } else {
+      // Jika tidak ada data user, tendang balik ke login
+      window.location.href = "/login";
     }
-    // Tidak perlu redirect manual di sini.
-    // Jika user tidak ada, App.jsx yang akan menendang ke /login secara otomatis.
   }, []);
 
   const handleLogout = () => {
-    if (window.confirm("Keluar dari aplikasi?")) {
+    toast.info("Sedang keluar...", {
+      duration: 1000,
+    });
+
+    setTimeout(() => {
       localStorage.clear();
+      toast.success("Berhasil keluar dari sistem");
       window.location.href = "/";
-    }
+    }, 1000);
   };
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  // Class untuk item menu sidebar agar konsisten
+  const menuItemClass = (menuName) => `
+    w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all group
+    ${
+      activeMenu === menuName
+        ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+    }
+  `;
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
       {/* SIDEBAR */}
       <aside
         className={`${
-          sidebarOpen ? "w-64" : "w-20"
-        } bg-slate-900 text-white transition-all duration-300 flex flex-col shadow-xl z-20`}
+          sidebarOpen ? "w-72" : "w-24"
+        } bg-slate-900 text-white transition-all duration-300 flex flex-col shadow-2xl z-20`}
       >
-        <div className="h-16 flex items-center justify-center border-b border-slate-800">
+        {/* HEADER SIDEBAR (LOGO & SUBTITLE) */}
+        <div
+          className={`flex flex-col justify-center items-center ${
+            sidebarOpen ? "p-6" : "p-4"
+          } border-b border-slate-800/50 transition-all duration-300 h-32 shrink-0`}
+        >
           {sidebarOpen ? (
-            <h1 className="text-xl font-black text-white tracking-tight">
-              HERIS
-            </h1>
+            <div className="flex flex-col items-center text-center animate-in fade-in duration-300">
+              <img
+                src="/logo.png"
+                alt="HERIS Logo"
+                className="h-10 w-auto mb-2 object-contain"
+              />
+              <p className="text-[10px] text-slate-400 font-medium leading-tight tracking-wide max-w-[150px]">
+                Human Edunesia Resource Information System
+              </p>
+            </div>
           ) : (
-            <span className="font-bold text-xl text-blue-400">H</span>
+            <img
+              src="/logo.png"
+              alt="HERIS Logo"
+              className="h-10 w-10 object-contain animate-in fade-in duration-300"
+            />
           )}
         </div>
 
-        <nav className="flex-1 py-6 px-3 space-y-2">
+        {/* NAVIGATION MENU */}
+        <nav className="flex-1 py-6 px-4 space-y-3 overflow-y-auto scrollbar-hide">
+          {/* Menu Dashboard / Monitoring */}
           <button
-            onClick={() => setActiveMenu("dashboard")}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
-              activeMenu === "dashboard"
-                ? "bg-blue-600 text-white"
-                : "text-slate-400 hover:bg-slate-800 hover:text-white"
-            }`}
+            onClick={() => {
+              setActiveMenu("dashboard");
+              toast.dismiss();
+            }}
+            className={menuItemClass("dashboard")}
           >
+            {/* Icon Outline Dashboard */}
             <svg
-              className="w-6 h-6"
+              xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
+              strokeWidth={1.5}
               stroke="currentColor"
+              className="w-6 h-6 shrink-0"
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
+                d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.5h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
               />
             </svg>
-            <span className={`${!sidebarOpen && "hidden"} font-medium`}>
-              {user.role === "Admin" ? "Monitoring" : "My Dashboard"}
+            <span
+              className={`${
+                !sidebarOpen && "hidden"
+              } font-medium text-sm truncate transition-all duration-300`}
+            >
+              {user.role === "Admin" ? "Monitoring SDM" : "My Dashboard"}
             </span>
           </button>
+
+          {/* Menu My SPD */}
           <button
-            onClick={() => setActiveMenu("spd")}
-            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
-              activeMenu === "spd"
-                ? "bg-blue-600 text-white"
-                : "text-slate-400 hover:bg-slate-800 hover:text-white"
-            }`}
+            onClick={() => {
+              setActiveMenu("spd");
+              toast.info("Modul SPD dalam pengembangan");
+            }}
+            className={menuItemClass("spd")}
           >
+            {/* Icon Outline Document/SPD */}
             <svg
-              className="w-6 h-6"
+              xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
+              strokeWidth={1.5}
               stroke="currentColor"
+              className="w-6 h-6 shrink-0"
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
               />
             </svg>
-            <span className={`${!sidebarOpen && "hidden"} font-medium`}>
+            <span
+              className={`${
+                !sidebarOpen && "hidden"
+              } font-medium text-sm truncate transition-all duration-300`}
+            >
               My SPD
             </span>
           </button>
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        {/* Bagian Logout */}
+        <div className="p-4 border-t border-slate-800/50 shrink-0">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 text-slate-400 hover:text-red-400"
+            className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all group"
           >
+            {/* Icon Outline Logout */}
             <svg
-              className="w-6 h-6"
+              xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
+              strokeWidth={1.5}
               stroke="currentColor"
+              className="w-6 h-6 shrink-0 group-hover:translate-x-1 transition-transform"
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
               />
             </svg>
-            <span className={`${!sidebarOpen && "hidden"} font-medium`}>
+            <span
+              className={`${
+                !sidebarOpen && "hidden"
+              } font-medium text-sm transition-all duration-300`}
+            >
               Logout
             </span>
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gray-100">
+        {/* HEADER NAVBAR */}
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10 shrink-0">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-gray-500 hover:text-blue-600"
+            className="transition-opacity hover:opacity-70 focus:outline-none"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h7"
-              />
-            </svg>
+            <img
+              src="/sidebar.png"
+              alt="Toggle Sidebar"
+              className="w-6 h-6 object-contain"
+            />
           </button>
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden md:block">
-              <div className="text-sm font-bold text-gray-800">
-                Hi, {user.nik}
+
+          <div className="flex items-center gap-4 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="text-right hidden sm:block">
+              <div className="text-sm font-black text-gray-900 leading-none mb-1">
+                Hi, {user.nama || "User"}
               </div>
-              <div className="text-[10px] bg-blue-50 text-blue-600 px-2 rounded-full font-bold uppercase inline-block">
-                {user.role}
+
+              <div className="flex justify-end gap-2 items-center">
+                <span className="text-[11px] text-gray-500 font-medium font-mono bg-gray-100 px-1.5 rounded">
+                  {user.nik}
+                </span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                    user.role === "Admin"
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-blue-100 text-blue-700"
+                  }`}
+                >
+                  {user.role}
+                </span>
               </div>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold">
-              {user.nik.charAt(0)}
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shadow-sm text-white uppercase ${
+                user.role === "Admin" ? "bg-purple-600" : "bg-blue-600"
+              }`}
+            >
+              {user.nama ? user.nama.charAt(0) : "?"}
             </div>
           </div>
         </header>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        {/* CONTENT SCROLLABLE AREA */}
+        <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
           {activeMenu === "spd" ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center h-full text-center animate-in zoom-in-95 duration-300">
+              <div className="w-24 h-24 bg-blue-50 rounded-[2rem] flex items-center justify-center mb-6 rotate-3 shadow-sm border border-blue-100">
                 <svg
                   className="w-10 h-10 text-blue-500"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  strokeWidth={1.5}
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
                   />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">Modul SPD</h2>
-              <p className="text-gray-500">
-                Fitur Pengajuan Dinas (SPD) segera hadir.
+              <h2 className="text-2xl font-black text-slate-900 mb-2">
+                Modul SPD
+              </h2>
+              <p className="text-slate-500 max-w-xs leading-relaxed text-sm">
+                Fitur Pengajuan Surat Perintah Dinas sedang dalam tahap
+                pengembangan.
               </p>
             </div>
-          ) : /* INI LOGIC SWITCHINGNYA */
-          user.role === "Admin" ? (
+          ) : user.role === "Admin" ? (
             <AdminDashboard />
           ) : (
             <UserDashboard currentUser={user} />
