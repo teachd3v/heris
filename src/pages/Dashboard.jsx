@@ -1,29 +1,63 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 import AdminDashboard from "../components/AdminDashboard";
 import UserDashboard from "../components/UserDashboard";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // State Sidebar: Default true hanya jika layar lebar (Desktop)
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  const [photoUrl, setPhotoUrl] = useState(null);
+
+  // 1. Cek User Login
   useEffect(() => {
-    // Ambil data user dari localStorage hasil login NIK
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     } else {
-      // Jika tidak ada data user, tendang balik ke login
       window.location.href = "/login";
     }
   }, []);
 
-  const handleLogout = () => {
-    toast.info("Sedang keluar...", {
-      duration: 1000,
-    });
+  // 2. Fetch Foto Profil
+  useEffect(() => {
+    const fetchProfilePhoto = async () => {
+      if (!user?.nik) return;
+      try {
+        const { data } = await supabase
+          .from("master_pekerjaan")
+          .select("master_personal:no_ktp(foto_profil)")
+          .eq("nik", user.nik)
+          .single();
 
+        if (data?.master_personal?.foto_profil) {
+          setPhotoUrl(data.master_personal.foto_profil);
+        }
+      } catch (error) {
+        console.error("Gagal load foto profil:", error);
+      }
+    };
+    fetchProfilePhoto();
+  }, [user]);
+
+  // 3. Listener Resize: Agar sidebar otomatis menyesuaikan saat rotasi layar / resize browser
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false); // Otomatis tutup di HP
+      } else {
+        setSidebarOpen(true); // Otomatis buka di Desktop
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleLogout = () => {
+    toast.info("Sedang keluar...", { duration: 1000 });
     setTimeout(() => {
       localStorage.clear();
       toast.success("Berhasil keluar dari sistem");
@@ -39,7 +73,7 @@ const Dashboard = () => {
     );
   }
 
-  // Class untuk item menu sidebar agar konsisten
+  // Helper Class Menu
   const menuItemClass = (menuName) => `
     w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all group
     ${
@@ -50,14 +84,25 @@ const Dashboard = () => {
   `;
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
-      {/* SIDEBAR */}
+    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden relative">
+      {/* --- BACKDROP (MOBILE ONLY) --- 
+          Layar gelap di belakang sidebar saat dibuka di HP 
+      */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)} // Klik gelap -> Tutup Sidebar
+          className="fixed inset-0 bg-black/50 z-20 md:hidden animate-in fade-in duration-300"
+        />
+      )}
+
+      {/* --- SIDEBAR --- */}
       <aside
-        className={`${
-          sidebarOpen ? "w-72" : "w-24"
-        } bg-slate-900 text-white transition-all duration-300 flex flex-col shadow-2xl z-20`}
+        className={`
+          fixed md:relative z-30 h-full bg-slate-900 text-white transition-all duration-300 flex flex-col shadow-2xl
+          ${sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full md:translate-x-0 md:w-24"}
+        `}
       >
-        {/* HEADER SIDEBAR (LOGO & SUBTITLE) */}
+        {/* HEADER SIDEBAR */}
         <div
           className={`flex flex-col justify-center items-center ${
             sidebarOpen ? "p-6" : "p-4"
@@ -83,17 +128,17 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* NAVIGATION MENU */}
+        {/* MENU */}
         <nav className="flex-1 py-6 px-4 space-y-3 overflow-y-auto scrollbar-hide">
-          {/* Menu Dashboard / Monitoring */}
           <button
             onClick={() => {
               setActiveMenu("dashboard");
               toast.dismiss();
+              // Di HP, kalau pilih menu sebaiknya sidebar otomatis nutup
+              if (window.innerWidth < 768) setSidebarOpen(false);
             }}
             className={menuItemClass("dashboard")}
           >
-            {/* Icon Outline Dashboard */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -109,23 +154,20 @@ const Dashboard = () => {
               />
             </svg>
             <span
-              className={`${
-                !sidebarOpen && "hidden"
-              } font-medium text-sm truncate transition-all duration-300`}
+              className={`${!sidebarOpen && "hidden md:block"} font-medium text-sm truncate transition-all duration-300`}
             >
               {user.role === "Admin" ? "Monitoring SDM" : "My Dashboard"}
             </span>
           </button>
 
-          {/* Menu My SPD */}
           <button
             onClick={() => {
               setActiveMenu("spd");
               toast.info("Modul SPD dalam pengembangan");
+              if (window.innerWidth < 768) setSidebarOpen(false);
             }}
             className={menuItemClass("spd")}
           >
-            {/* Icon Outline Document/SPD */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -141,22 +183,19 @@ const Dashboard = () => {
               />
             </svg>
             <span
-              className={`${
-                !sidebarOpen && "hidden"
-              } font-medium text-sm truncate transition-all duration-300`}
+              className={`${!sidebarOpen && "hidden md:block"} font-medium text-sm truncate transition-all duration-300`}
             >
               My SPD
             </span>
           </button>
         </nav>
 
-        {/* Bagian Logout */}
+        {/* LOGOUT */}
         <div className="p-4 border-t border-slate-800/50 shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all group"
           >
-            {/* Icon Outline Logout */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -172,9 +211,7 @@ const Dashboard = () => {
               />
             </svg>
             <span
-              className={`${
-                !sidebarOpen && "hidden"
-              } font-medium text-sm transition-all duration-300`}
+              className={`${!sidebarOpen && "hidden md:block"} font-medium text-sm transition-all duration-300`}
             >
               Logout
             </span>
@@ -182,7 +219,7 @@ const Dashboard = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
+      {/* --- MAIN CONTENT --- */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gray-100">
         {/* HEADER NAVBAR */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10 shrink-0">
@@ -202,33 +239,38 @@ const Dashboard = () => {
               <div className="text-sm font-black text-gray-900 leading-none mb-1">
                 Hi, {user.nama || "User"}
               </div>
-
               <div className="flex justify-end gap-2 items-center">
                 <span className="text-[11px] text-gray-500 font-medium font-mono bg-gray-100 px-1.5 rounded">
                   {user.nik}
                 </span>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                    user.role === "Admin"
-                      ? "bg-purple-100 text-purple-700"
-                      : "bg-blue-100 text-blue-700"
-                  }`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${user.role === "Admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}
                 >
                   {user.role}
                 </span>
               </div>
             </div>
+
+            {/* AVATAR */}
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shadow-sm text-white uppercase ${
-                user.role === "Admin" ? "bg-purple-600" : "bg-blue-600"
-              }`}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shadow-sm text-white uppercase overflow-hidden ${!photoUrl ? (user.role === "Admin" ? "bg-purple-600" : "bg-blue-600") : "bg-gray-200"}`}
             >
-              {user.nama ? user.nama.charAt(0) : "?"}
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt="Profil"
+                  className="w-full h-full object-cover"
+                />
+              ) : user.nama ? (
+                user.nama.charAt(0)
+              ) : (
+                "?"
+              )}
             </div>
           </div>
         </header>
 
-        {/* CONTENT SCROLLABLE AREA */}
+        {/* CONTENT AREA */}
         <div className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 relative scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
           {activeMenu === "spd" ? (
             <div className="flex flex-col items-center justify-center h-full text-center animate-in zoom-in-95 duration-300">
