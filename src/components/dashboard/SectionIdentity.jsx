@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Input from "../Input";
-import { supabase } from "../../lib/supabase";
+import { uploadToCloudinary } from "../../lib/cloudinary";
 import { toast } from "sonner";
 
 const SectionIdentity = ({ data, onChange, setPersonalData }) => {
@@ -37,30 +37,12 @@ const SectionIdentity = ({ data, onChange, setPersonalData }) => {
       }
 
       const file = event.target.files[0];
-      const fileExt = file.name.split(".").pop();
-
-      // SANITIZE: Pastikan nama file bersih + Timestamp
-      const cleanKtp = (data.no_ktp || "user").replace(/[^a-zA-Z0-9]/g, "");
-      const fileName = `${cleanKtp}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      // Upload ke bucket 'avatars'
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Dapatkan URL Public
-      const { data: urlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(filePath);
+      
+      // Upload ke Cloudinary
+      const photoUrl = await uploadToCloudinary(file);
 
       // Update State Lokal
-      setPersonalData((prev) => ({ ...prev, foto_profil: urlData.publicUrl }));
+      setPersonalData((prev) => ({ ...prev, foto_profil: photoUrl }));
       toast.success("Foto berhasil diunggah!");
     } catch (error) {
       console.error("Upload Error:", error);

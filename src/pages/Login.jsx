@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { db } from "../lib/db";
 import { toast } from "sonner";
 
 const Login = () => {
@@ -13,38 +13,41 @@ const Login = () => {
 
     try {
       // 1. Verifikasi User & Password di master_users
-      const { data: userData, error: userError } = await supabase
-        .from("master_users")
-        .select("nik, password, role")
-        .eq("nik", nik)
-        .maybeSingle();
-
-      if (userError) throw userError;
+      const users = await db`
+        SELECT nik, password, role 
+        FROM master_users 
+        WHERE nik = ${nik} 
+        LIMIT 1
+      `;
+      
+      const userData = users[0];
 
       if (!userData) {
         toast.error("NIK tidak terdaftar.");
       } else if (password === userData.password) {
         // 2. JEMBATAN: Ambil no_ktp dari master_pekerjaan berdasarkan nik
-        const { data: kerjaData, error: kerjaError } = await supabase
-          .from("master_pekerjaan")
-          .select("no_ktp")
-          .eq("nik", userData.nik)
-          .maybeSingle();
-
-        if (kerjaError) throw kerjaError;
+        const pekerjaan = await db`
+          SELECT no_ktp 
+          FROM master_pekerjaan 
+          WHERE nik = ${userData.nik} 
+          LIMIT 1
+        `;
+        
+        const kerjaData = pekerjaan[0];
 
         let namaFinal = "User";
 
         // 3. AMBIL NAMA dari master_personal berdasarkan no_ktp
         if (kerjaData?.no_ktp) {
-          const { data: personalData } = await supabase
-            .from("master_personal")
-            .select("nama_lengkap")
-            .eq("no_ktp", kerjaData.no_ktp)
-            .maybeSingle();
-
-          if (personalData?.nama_lengkap) {
-            namaFinal = personalData.nama_lengkap;
+          const personal = await db`
+            SELECT nama_lengkap 
+            FROM master_personal 
+            WHERE no_ktp = ${kerjaData.no_ktp} 
+            LIMIT 1
+          `;
+          
+          if (personal[0]?.nama_lengkap) {
+            namaFinal = personal[0].nama_lengkap;
           }
         }
 

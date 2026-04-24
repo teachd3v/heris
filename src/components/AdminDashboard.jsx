@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { db } from "../lib/db";
 import { toast } from "sonner";
 import ModalDetail from "./ModalDetail";
 
@@ -89,28 +89,33 @@ const AdminDashboard = () => {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      // 1. FETCH DATA
-      const { data, error } = await supabase
-        .from("master_pekerjaan")
-        .select(
-          `
-          *,
-          master_personal:no_ktp (
-            *,
-            master_anak (*)
-          )
-        `,
-        )
-        .order("nama", { ascending: true });
+      // FETCH DATA pakai SQL Join (Lebih powerful & hemat query)
+      const data = await db`
+        SELECT 
+          pk.*,
+          p.nama_lengkap,
+          p.foto_profil,
+          p.tempat_lahir,
+          p.tanggal_lahir,
+          p.jenis_kelamin,
+          p.email_pribadi,
+          p.kontak,
+          p.alamat_domisili,
+          (
+            SELECT json_agg(a.*) 
+            FROM master_anak a 
+            WHERE a.no_ktp_ortu = p.no_ktp
+          ) as master_anak
+        FROM master_pekerjaan pk
+        LEFT JOIN master_personal p ON pk.no_ktp = p.no_ktp
+        ORDER BY pk.nama ASC
+      `;
 
-      if (error) throw error;
-
-      // 2. BUAT LOOKUP MAP (NIK -> NAMA)
+      // 2. BUAT LOOKUP MAP (NIK -> NAMA) untuk Atasan
       const nikToName = {};
       data.forEach((emp) => {
         if (emp.nik) {
-          nikToName[emp.nik] =
-            emp.nama || emp.master_personal?.nama_lengkap || "Tanpa Nama";
+          nikToName[emp.nik] = emp.nama || emp.nama_lengkap || "Tanpa Nama";
         }
       });
 
@@ -120,7 +125,18 @@ const AdminDashboard = () => {
         nama_atasan: emp.nik_atasan
           ? nikToName[emp.nik_atasan] || `NIK: ${emp.nik_atasan}`
           : "-",
-        master_personal: emp.master_personal || {},
+        // Kembalikan struktur master_personal agar ModalDetail tidak error
+        master_personal: {
+          nama_lengkap: emp.nama_lengkap,
+          foto_profil: emp.foto_profil,
+          tempat_lahir: emp.tempat_lahir,
+          tanggal_lahir: emp.tanggal_lahir,
+          jenis_kelamin: emp.jenis_kelamin,
+          email_pribadi: emp.email_pribadi,
+          kontak: emp.kontak,
+          alamat_domisili: emp.alamat_domisili,
+          master_anak: emp.master_anak || []
+        }
       }));
 
       setEmployees(enrichedData);

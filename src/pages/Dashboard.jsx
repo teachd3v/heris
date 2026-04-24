@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "../lib/supabase";
+import { db } from "../lib/db";
 import AdminDashboard from "../components/AdminDashboard";
 import UserDashboard from "../components/UserDashboard";
 
@@ -27,14 +27,16 @@ const Dashboard = () => {
     const fetchProfilePhoto = async () => {
       if (!user?.nik) return;
       try {
-        const { data } = await supabase
-          .from("master_pekerjaan")
-          .select("master_personal:no_ktp(foto_profil)")
-          .eq("nik", user.nik)
-          .single();
+        const results = await db`
+          SELECT p.foto_profil 
+          FROM master_pekerjaan pk
+          JOIN master_personal p ON pk.no_ktp = p.no_ktp
+          WHERE pk.nik = ${user.nik}
+          LIMIT 1
+        `;
 
-        if (data?.master_personal?.foto_profil) {
-          setPhotoUrl(data.master_personal.foto_profil);
+        if (results[0]?.foto_profil) {
+          setPhotoUrl(results[0].foto_profil);
         }
       } catch (error) {
         console.error("Gagal load foto profil:", error);

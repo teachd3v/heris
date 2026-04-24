@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { db } from "../../lib/db";
 import { toast } from "sonner";
 import Input from "../Input";
 
@@ -68,24 +68,31 @@ const SectionChildren = ({ childrenList, parentKtp, onRefresh }) => {
     try {
       if (editingId) {
         // Update
-        const { error } = await supabase
-          .from("master_anak")
-          .update(formData)
-          .eq("id", editingId);
-        if (error) throw error;
+        await db`
+          UPDATE master_anak 
+          SET 
+            nama_anak = ${formData.nama_anak},
+            no_ktp_anak = ${formData.no_ktp_anak},
+            tempat_lahir = ${formData.tempat_lahir},
+            tanggal_lahir = ${formData.tanggal_lahir},
+            jenis_kelamin = ${formData.jenis_kelamin},
+            status_kegiatan = ${formData.status_kegiatan}
+          WHERE id = ${editingId}
+        `;
         toast.success("Data anak diperbarui");
       } else {
         // Insert Baru
-        const { error } = await supabase
-          .from("master_anak")
-          .insert([{ ...formData, parent_no_ktp: parentKtp }]);
-        if (error) throw error;
+        await db`
+          INSERT INTO master_anak (nama_anak, no_ktp_anak, tempat_lahir, tanggal_lahir, jenis_kelamin, status_kegiatan, no_ktp_ortu)
+          VALUES (${formData.nama_anak}, ${formData.no_ktp_anak}, ${formData.tempat_lahir}, ${formData.tanggal_lahir}, ${formData.jenis_kelamin}, ${formData.status_kegiatan}, ${parentKtp})
+        `;
         toast.success("Anak berhasil ditambahkan");
       }
 
       handleCancel(); // Tutup form
       onRefresh(); // Minta parent refresh data
     } catch (error) {
+      console.error("Save Error:", error);
       toast.error("Gagal menyimpan: " + error.message);
     } finally {
       setLoading(false);
@@ -96,10 +103,11 @@ const SectionChildren = ({ childrenList, parentKtp, onRefresh }) => {
   const handleDelete = async (id) => {
     if (!confirm("Yakin hapus data anak ini?")) return;
     try {
-      await supabase.from("master_anak").delete().eq("id", id);
+      await db`DELETE FROM master_anak WHERE id = ${id}`;
       toast.success("Dihapus");
       onRefresh();
     } catch (e) {
+      console.error("Delete Error:", e);
       toast.error("Gagal hapus");
     }
   };

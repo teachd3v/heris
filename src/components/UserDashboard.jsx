@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { db } from "../lib/db";
 import { toast } from "sonner";
 import SectionIdentity from "./dashboard/SectionIdentity";
 import SectionEducation from "./dashboard/SectionEducation";
@@ -21,20 +21,28 @@ const UserDashboard = ({ currentUser }) => {
   const fetchMyData = async () => {
     setLoading(true);
     try {
-      // Ambil data personal + anak
-      const { data, error } = await supabase
-        .from("master_pekerjaan")
-        .select(`no_ktp, master_personal:no_ktp ( *, master_anak (*) )`)
-        .eq("nik", currentUser.nik)
-        .single();
+      // Ambil data personal + anak (Pakai SQL Join agar efisien)
+      const results = await db`
+        SELECT 
+          p.*,
+          (
+            SELECT json_agg(a.*) 
+            FROM master_anak a 
+            WHERE a.no_ktp_ortu = p.no_ktp
+          ) as master_anak
+        FROM master_pekerjaan pk
+        JOIN master_personal p ON pk.no_ktp = p.no_ktp
+        WHERE pk.nik = ${currentUser.nik}
+        LIMIT 1
+      `;
 
-      if (error) throw error;
+      const data = results[0];
 
-      if (data?.master_personal) {
-        setPersonalData(data.master_personal);
+      if (data) {
+        setPersonalData(data);
 
         // Sortir anak berdasarkan tanggal lahir
-        const sortedChildren = (data.master_personal.master_anak || []).sort(
+        const sortedChildren = (data.master_anak || []).sort(
           (a, b) => new Date(a.tanggal_lahir) - new Date(b.tanggal_lahir),
         );
         setChildrenList(sortedChildren);
@@ -59,27 +67,41 @@ const UserDashboard = ({ currentUser }) => {
     setUpdating(true);
 
     // Pisahkan data anak dari object personalData agar tidak error saat update
-    const { master_anak, ...cleanData } = personalData;
+    const { master_anak, created_at, ...cleanData } = personalData;
 
     try {
-      const { error } = await supabase
-        .from("master_personal")
-        .update(cleanData)
-        .eq("no_ktp", personalData.no_ktp);
+      // Update di Neon pakai SQL
+      await db`
+        UPDATE master_personal 
+        SET 
+          nama_lengkap = ${cleanData.nama_lengkap},
+          tempat_lahir = ${cleanData.tempat_lahir},
+          tanggal_lahir = ${cleanData.tanggal_lahir},
+          jenis_kelamin = ${cleanData.jenis_kelamin},
+          golongan_darah = ${cleanData.golongan_darah},
+          email_pribadi = ${cleanData.email_pribadi},
+          kontak = ${cleanData.kontak},
+          provinsi = ${cleanData.provinsi},
+          kabupaten_kota = ${cleanData.kabupaten_kota},
+          kecamatan = ${cleanData.kecamatan},
+          desa_kelurahan = ${cleanData.desa_kelurahan},
+          alamat_domisili = ${cleanData.alamat_domisili},
+          foto_profil = ${cleanData.foto_profil},
+          sim_a = ${cleanData.sim_a},
+          sim_b = ${cleanData.sim_b},
+          sim_c = ${cleanData.sim_c}
+        WHERE no_ktp = ${cleanData.no_ktp}
+      `;
 
-      if (error) throw error;
-
-      // 1. Tampilkan Notifikasi Sukses
       toast.success("Data berhasil disimpan! Memuat ulang...");
 
-      // 2. Refresh Halaman (Hard Reload) setelah 1.5 detik
-      // Tujuannya agar Foto Profil di Navbar (Parent Component) ikut ter-update
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (error) {
+      console.error("Update Error:", error);
       toast.error("Gagal menyimpan: " + error.message);
-      setUpdating(false); // Hanya matikan loading jika error (biarkan loading jika sukses sampai reload)
+      setUpdating(false);
     }
   };
 
